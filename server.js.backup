@@ -1,0 +1,1272 @@
+const express = require('express');
+const cors = require('cors');
+const fetch = require('node-fetch');
+const fs = require('fs');
+const path = require('path');
+require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.static('.')); // Serve static files from current directory
+
+// Environment variables
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+
+// Statistics file path
+const STATS_FILE = path.join(__dirname, 'statistics.txt');
+
+// Initialize statistics tracking
+let stats = {
+    totalPageViews: 0,
+    totalAIRecipeCalls: 0,
+    totalUniqueRecipesGenerated: 0,
+    totalRecipesLiked: 0,
+    totalRecipesDisliked: 0,
+    goalTypeBreakdown: {
+        cut: 0,
+        no_goal: 0,
+        bulk: 0
+    },
+    cuisinePreferences: {
+        global: 0,
+        italian: 0,
+        mexican: 0,
+        asian: 0,
+        indian: 0,
+        mediterranean: 0,
+        american: 0,
+        french: 0,
+        middle_eastern: 0,
+        african: 0,
+        latin_american: 0
+    },
+    cuisineRecipes: {
+        italian: 0,
+        mexican: 0,
+        asian: 0,
+        indian: 0,
+        mediterranean: 0,
+        american: 0,
+        french: 0,
+        middle_eastern: 0,
+        african: 0,
+        latin_american: 0
+    },
+    dietaryRestrictions: {
+        no_restrictions: 0,
+        gluten_free: 0,
+        vegan: 0,
+        dairy_free: 0,
+        nut_free: 0,
+        low_sodium: 0,
+        other: 0
+    },
+    recentActivity: [],
+    serverStartTime: new Date().toISOString(),
+    lastRecipeGenerated: null,
+    averageGenerationTime: 0
+};
+
+// Load existing statistics
+loadStatistics();
+
+// Statistics management functions
+function loadStatistics() {
+    try {
+        if (fs.existsSync(STATS_FILE)) {
+            const content = fs.readFileSync(STATS_FILE, 'utf8');
+            const lines = content.split('\n');
+            let currentSection = '';
+            
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                
+                // Track current section
+                if (trimmedLine.includes('=== GENERAL STATISTICS ===')) {
+                    currentSection = 'general';
+                } else if (trimmedLine.includes('=== GOAL TYPE BREAKDOWN ===')) {
+                    currentSection = 'goalType';
+                } else if (trimmedLine.includes('=== CUISINE PREFERENCES ===')) {
+                    currentSection = 'cuisinePreferences';
+                } else if (trimmedLine.includes('=== CUISINE RECIPES ===')) {
+                    currentSection = 'cuisineRecipes';
+                } else if (trimmedLine.includes('=== DIETARY RESTRICTIONS ===')) {
+                    currentSection = 'dietaryRestrictions';
+                } else if (trimmedLine.includes('=== RECIPE FEEDBACK ===')) {
+                    currentSection = 'feedback';
+                } else if (trimmedLine.includes('=== RECENT ACTIVITY ===')) {
+                    currentSection = 'activity';
+                } else if (trimmedLine.includes('=== SYSTEM INFORMATION ===')) {
+                    currentSection = 'system';
+                }
+                
+                // Parse data based on current section
+                if (currentSection === 'general') {
+                    if (trimmedLine.includes('Total Page Views:')) {
+                        stats.totalPageViews = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Total AI Recipe Calls:')) {
+                        stats.totalAIRecipeCalls = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Total Unique Recipes Generated:')) {
+                        stats.totalUniqueRecipesGenerated = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Total Recipes Liked:')) {
+                        stats.totalRecipesLiked = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Total Recipes Disliked:')) {
+                        stats.totalRecipesDisliked = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    }
+                } else if (currentSection === 'goalType') {
+                    if (trimmedLine.includes('Cut (Weight Loss) Recipes:')) {
+                        stats.goalTypeBreakdown.cut = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('No Goal (Balanced) Recipes:')) {
+                        stats.goalTypeBreakdown.no_goal = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Bulk (Muscle Gain) Recipes:')) {
+                        stats.goalTypeBreakdown.bulk = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    }
+                } else if (currentSection === 'cuisinePreferences') {
+                    if (trimmedLine.includes('Global:')) {
+                        stats.cuisinePreferences.global = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Italian:')) {
+                        stats.cuisinePreferences.italian = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Mexican:')) {
+                        stats.cuisinePreferences.mexican = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Asian:')) {
+                        stats.cuisinePreferences.asian = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Indian:')) {
+                        stats.cuisinePreferences.indian = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Mediterranean:')) {
+                        stats.cuisinePreferences.mediterranean = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('American:')) {
+                        stats.cuisinePreferences.american = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('French:')) {
+                        stats.cuisinePreferences.french = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Middle Eastern:')) {
+                        stats.cuisinePreferences.middle_eastern = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('African:')) {
+                        stats.cuisinePreferences.african = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Latin American:')) {
+                        stats.cuisinePreferences.latin_american = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    }
+                } else if (currentSection === 'cuisineRecipes') {
+                    // Parse dynamic cuisine recipes
+                    if (trimmedLine.includes(':') && !trimmedLine.includes('===')) {
+                        const [cuisineName, count] = trimmedLine.split(':');
+                        const cleanCuisineName = cuisineName.trim().toLowerCase().replace(/\s+/g, '_');
+                        const cuisineCount = parseInt(count.trim()) || 0;
+                        stats.cuisineRecipes[cleanCuisineName] = cuisineCount;
+                    }
+                } else if (currentSection === 'dietaryRestrictions') {
+                    if (trimmedLine.includes('No Restrictions:')) {
+                        stats.dietaryRestrictions.no_restrictions = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Gluten-Free:')) {
+                        stats.dietaryRestrictions.gluten_free = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Vegan:')) {
+                        stats.dietaryRestrictions.vegan = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Dairy-Free:')) {
+                        stats.dietaryRestrictions.dairy_free = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Nut-Free:')) {
+                        stats.dietaryRestrictions.nut_free = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Low-Sodium:')) {
+                        stats.dietaryRestrictions.low_sodium = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    } else if (trimmedLine.includes('Other:')) {
+                        stats.dietaryRestrictions.other = parseInt(trimmedLine.split(':')[1].trim()) || 0;
+                    }
+                } else if (currentSection === 'system') {
+                    if (trimmedLine.includes('Server Start Time:')) {
+                        const startTime = trimmedLine.split(':').slice(1).join(':').trim();
+                        if (startTime && startTime !== 'Not Started') {
+                            stats.serverStartTime = startTime;
+                        }
+                    } else if (trimmedLine.includes('Last Recipe Generated:')) {
+                        const lastGenerated = trimmedLine.split(':').slice(1).join(':').trim();
+                        if (lastGenerated && lastGenerated !== 'None') {
+                            stats.lastRecipeGenerated = lastGenerated;
+                        }
+                    }
+                }
+            }
+            
+            console.log('Statistics loaded successfully from file');
+        } else {
+            console.log('No existing statistics file found, starting fresh');
+        }
+    } catch (error) {
+        console.error('Error loading statistics:', error);
+    }
+}
+
+function updateStatistics(type, data = {}) {
+    try {
+        switch (type) {
+            case 'page_view':
+                stats.totalPageViews++;
+                break;
+            case 'recipe_call':
+                stats.totalAIRecipeCalls++;
+                const recipeCount = data.recipeCount || 1;
+                stats.totalUniqueRecipesGenerated += recipeCount;
+                
+                // Update goal type breakdown (count recipes, not calls)
+                if (data.goalType) {
+                    stats.goalTypeBreakdown[data.goalType] = (stats.goalTypeBreakdown[data.goalType] || 0) + recipeCount;
+                }
+                
+                // Update cuisine preferences (count calls)
+                if (data.cuisine) {
+                    const cuisineKey = data.cuisine.toLowerCase().replace(' ', '_');
+                    stats.cuisinePreferences[cuisineKey] = (stats.cuisinePreferences[cuisineKey] || 0) + 1;
+                }
+                
+                // Update cuisine recipes (count individual recipe cuisines)
+                if (data.recipes && Array.isArray(data.recipes)) {
+                    // Track each individual recipe's cuisine
+                    data.recipes.forEach(recipe => {
+                        if (recipe.cuisine) {
+                            // Clean the cuisine name (remove "inspired", extra spaces, etc.)
+                            let cleanCuisine = recipe.cuisine.toLowerCase()
+                                .replace(/\s*\(inspired\)/g, '')
+                                .replace(/\s*inspired/g, '')
+                                .replace(/\s+/g, '_')
+                                .trim();
+                            
+                            // Map common cuisine variations to our standard keys
+                            const cuisineMapping = {
+                                'chinese': 'asian',
+                                'japanese': 'asian',
+                                'korean': 'asian',
+                                'thai': 'asian',
+                                'vietnamese': 'asian',
+                                'middle_eastern': 'middle_eastern',
+                                'arabic': 'middle_eastern',
+                                'persian': 'middle_eastern',
+                                'latin_american': 'latin_american',
+                                'south_american': 'latin_american',
+                                'brazilian': 'latin_american'
+                            };
+                            
+                            const mappedCuisine = cuisineMapping[cleanCuisine] || cleanCuisine;
+                            
+                            // If cuisine doesn't exist in our stats, add it dynamically
+                            if (!stats.cuisineRecipes.hasOwnProperty(mappedCuisine)) {
+                                stats.cuisineRecipes[mappedCuisine] = 0;
+                            }
+                            
+                            stats.cuisineRecipes[mappedCuisine] = (stats.cuisineRecipes[mappedCuisine] || 0) + 1;
+                        }
+                    });
+                } else if (data.cuisine && data.cuisine.toLowerCase() !== 'global') {
+                    // Fallback: if no individual recipes, use the preference (for backward compatibility)
+                    const cuisineKey = data.cuisine.toLowerCase().replace(' ', '_');
+                    if (!stats.cuisineRecipes.hasOwnProperty(cuisineKey)) {
+                        stats.cuisineRecipes[cuisineKey] = 0;
+                    }
+                    stats.cuisineRecipes[cuisineKey] = (stats.cuisineRecipes[cuisineKey] || 0) + recipeCount;
+                }
+                
+                if (data.dietaryRestrictions) {
+                    const restrictions = data.dietaryRestrictions.toLowerCase();
+                    if (restrictions.includes('gluten')) stats.dietaryRestrictions.gluten_free++;
+                    else if (restrictions.includes('vegan')) stats.dietaryRestrictions.vegan++;
+                    else if (restrictions.includes('dairy')) stats.dietaryRestrictions.dairy_free++;
+                    else if (restrictions.includes('nut')) stats.dietaryRestrictions.nut_free++;
+                    else if (restrictions.includes('sodium')) stats.dietaryRestrictions.low_sodium++;
+                    else if (restrictions.trim()) stats.dietaryRestrictions.other++;
+                    else stats.dietaryRestrictions.no_restrictions++;
+                } else {
+                    stats.dietaryRestrictions.no_restrictions++;
+                }
+                stats.lastRecipeGenerated = new Date().toISOString();
+                stats.recentActivity.unshift({
+                    timestamp: new Date().toISOString(),
+                    type: 'recipe_generated',
+                    goalType: data.goalType,
+                    cuisine: data.cuisine,
+                    recipeCount: data.recipeCount
+                });
+                // Keep only last 10 activities
+                stats.recentActivity = stats.recentActivity.slice(0, 10);
+                break;
+            case 'recipe_like':
+                stats.totalRecipesLiked++;
+                break;
+            case 'recipe_dislike':
+                stats.totalRecipesDisliked++;
+                break;
+        }
+        saveStatistics();
+    } catch (error) {
+        console.error('Error updating statistics:', error);
+    }
+}
+
+function saveStatistics() {
+    try {
+        const likeRate = stats.totalRecipesLiked + stats.totalRecipesDisliked > 0 
+            ? ((stats.totalRecipesLiked / (stats.totalRecipesLiked + stats.totalRecipesDisliked)) * 100).toFixed(1)
+            : '0';
+        const dislikeRate = stats.totalRecipesLiked + stats.totalRecipesDisliked > 0 
+            ? ((stats.totalRecipesDisliked / (stats.totalRecipesLiked + stats.totalRecipesDisliked)) * 100).toFixed(1)
+            : '0';
+
+        const content = `Nourish 'N' Flourish - AI Recipe Generator Statistics
+====================================================
+
+Last Updated: ${new Date().toLocaleString()}
+
+=== GENERAL STATISTICS ===
+Total Page Views: ${stats.totalPageViews}
+Total AI Recipe Calls: ${stats.totalAIRecipeCalls}
+Total Unique Recipes Generated: ${stats.totalUniqueRecipesGenerated}
+Total Recipes Liked: ${stats.totalRecipesLiked}
+Total Recipes Disliked: ${stats.totalRecipesDisliked}
+
+=== GOAL TYPE BREAKDOWN ===
+Cut (Weight Loss) Recipes: ${stats.goalTypeBreakdown.cut}
+No Goal (Balanced) Recipes: ${stats.goalTypeBreakdown.no_goal}
+Bulk (Muscle Gain) Recipes: ${stats.goalTypeBreakdown.bulk}
+
+=== CUISINE PREFERENCES ===
+Global: ${stats.cuisinePreferences.global}
+Italian: ${stats.cuisinePreferences.italian}
+Mexican: ${stats.cuisinePreferences.mexican}
+Asian: ${stats.cuisinePreferences.asian}
+Indian: ${stats.cuisinePreferences.indian}
+Mediterranean: ${stats.cuisinePreferences.mediterranean}
+American: ${stats.cuisinePreferences.american}
+French: ${stats.cuisinePreferences.french}
+Middle Eastern: ${stats.cuisinePreferences.middle_eastern}
+African: ${stats.cuisinePreferences.african}
+Latin American: ${stats.cuisinePreferences.latin_american}
+
+=== CUISINE RECIPES ===
+${Object.keys(stats.cuisineRecipes)
+    .sort()
+    .map(cuisine => {
+        const displayName = cuisine.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        return `${displayName}: ${stats.cuisineRecipes[cuisine]}`;
+    })
+    .join('\n')}
+
+=== DIETARY RESTRICTIONS ===
+No Restrictions: ${stats.dietaryRestrictions.no_restrictions}
+Gluten-Free: ${stats.dietaryRestrictions.gluten_free}
+Vegan: ${stats.dietaryRestrictions.vegan}
+Dairy-Free: ${stats.dietaryRestrictions.dairy_free}
+Nut-Free: ${stats.dietaryRestrictions.nut_free}
+Low-Sodium: ${stats.dietaryRestrictions.low_sodium}
+Other: ${stats.dietaryRestrictions.other}
+
+=== RECIPE FEEDBACK ===
+Like Rate: ${likeRate}%
+Dislike Rate: ${dislikeRate}%
+Total Feedback Given: ${stats.totalRecipesLiked + stats.totalRecipesDisliked}
+
+=== RECENT ACTIVITY ===
+${stats.recentActivity.map(activity => 
+    `${activity.timestamp} - ${activity.type} (${activity.goalType}, ${activity.cuisine}, ${activity.recipeCount} recipes)`
+).join('\n') || '(No recent activity)'}
+
+=== SYSTEM INFORMATION ===
+Server Start Time: ${stats.serverStartTime}
+Last Recipe Generated: ${stats.lastRecipeGenerated || 'None'}
+Average Recipe Generation Time: ${stats.averageGenerationTime} seconds`;
+
+        fs.writeFileSync(STATS_FILE, content, 'utf8');
+    } catch (error) {
+        console.error('Error saving statistics:', error);
+    }
+}
+
+// Page view tracking endpoint
+app.get('/api/track-page-view', (req, res) => {
+    updateStatistics('page_view');
+    res.json({ success: true });
+});
+
+// Recipe feedback endpoint
+app.post('/api/recipe-feedback', (req, res) => {
+    try {
+        const { type } = req.body; // 'like' or 'dislike'
+        if (type === 'like') {
+            updateStatistics('recipe_like');
+        } else if (type === 'dislike') {
+            updateStatistics('recipe_dislike');
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error processing feedback:', error);
+        res.status(500).json({ error: 'Failed to process feedback' });
+    }
+});
+
+// Recipe generation endpoint
+app.post('/api/generate-recipes', async (req, res) => {
+    try {
+        const { ingredients, servingSize, goalType, cuisine, dietaryRestrictions, unitSystem, recipeCount } = req.body;
+
+        // Validate input
+        if (!ingredients || !servingSize || !goalType || !cuisine || !recipeCount) {
+            return res.status(400).json({ 
+                error: 'Missing required fields: ingredients, servingSize, goalType, cuisine, recipeCount' 
+            });
+        }
+
+        // Validate recipe count
+        const count = parseInt(recipeCount);
+        if (isNaN(count) || count < 1 || count > 7) {
+            return res.status(400).json({ 
+                error: 'Recipe count must be between 1 and 7' 
+            });
+        }
+
+        if (!GEMINI_API_KEY) {
+            return res.status(500).json({ 
+                error: 'Gemini API key not configured. Please set GEMINI_API_KEY environment variable in your .env file.' 
+            });
+        }
+
+        // Check for dietary restriction conflicts
+        const conflictCheck = checkDietaryConflicts(ingredients, dietaryRestrictions);
+        if (conflictCheck.hasConflict) {
+            return res.status(400).json({
+                error: 'Dietary restriction conflict detected',
+                message: conflictCheck.message,
+                suggestions: conflictCheck.suggestions
+            });
+        }
+
+        // Build the prompt
+        const prompt = buildRecipePrompt(ingredients, servingSize, goalType, cuisine, dietaryRestrictions, unitSystem, count);
+
+        // Call Gemini API
+        const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{
+                        text: prompt
+                    }]
+                }],
+                generationConfig: {
+                    temperature: 0.8,
+                    topK: 40,
+                    topP: 0.95,
+                    maxOutputTokens: 8000,
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Gemini API Error:', errorData);
+            return res.status(response.status).json({ 
+                error: 'Failed to generate recipes from Gemini API. Please check your API key and try again.',
+                details: errorData
+            });
+        }
+
+        const data = await response.json();
+        
+        // Extract the generated text
+        const generatedText = data.candidates[0].content.parts[0].text;
+        
+        // Log the raw response for debugging
+        console.log('Raw AI Response:', generatedText);
+        
+        // Parse the generated text into structured recipes
+        const recipes = parseRecipesFromText(generatedText, goalType, ingredients, unitSystem, count);
+        
+        // Validate recipes before sending
+        const validatedRecipes = validateRecipes(recipes);
+        
+        // Update statistics
+        updateStatistics('recipe_call', {
+            goalType,
+            cuisine,
+            dietaryRestrictions,
+            recipeCount: parseInt(recipeCount),
+            recipes: validatedRecipes // Pass the actual recipes to track individual cuisines
+        });
+        
+        res.json({
+            success: true,
+            recipes: validatedRecipes,
+            rawResponse: generatedText
+        });
+
+    } catch (error) {
+        console.error('Server Error:', error);
+        res.status(500).json({ 
+            error: 'Internal server error',
+            message: error.message 
+        });
+    }
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'healthy', 
+        timestamp: new Date().toISOString(),
+        geminiConfigured: !!GEMINI_API_KEY
+    });
+});
+
+// Check for dietary restriction conflicts
+function checkDietaryConflicts(ingredients, dietaryRestrictions) {
+    if (!dietaryRestrictions || !dietaryRestrictions.trim()) {
+        return { hasConflict: false };
+    }
+
+    const restrictions = dietaryRestrictions.toLowerCase().split(/[,\s]+/).filter(r => r.trim());
+    const ingredientList = ingredients.toLowerCase();
+    
+    const conflicts = [];
+    const suggestions = [];
+
+    // Check for vegan conflicts
+    if (restrictions.some(r => r.includes('vegan'))) {
+        const nonVeganIngredients = ['chicken', 'beef', 'pork', 'fish', 'salmon', 'tuna', 'egg', 'eggs', 'milk', 'cheese', 'yogurt', 'butter', 'cream'];
+        const foundNonVegan = nonVeganIngredients.filter(ing => ingredientList.includes(ing));
+        if (foundNonVegan.length > 0) {
+            conflicts.push(`Vegan restriction conflicts with: ${foundNonVegan.join(', ')}`);
+            suggestions.push('Remove animal products or add plant-based alternatives like tofu, tempeh, legumes, or plant milk');
+        }
+    }
+
+    // Check for gluten-free conflicts
+    if (restrictions.some(r => r.includes('gluten'))) {
+        const glutenIngredients = ['wheat', 'bread', 'pasta', 'flour', 'noodle', 'tortilla', 'wrap'];
+        const foundGluten = glutenIngredients.filter(ing => ingredientList.includes(ing));
+        if (foundGluten.length > 0) {
+            conflicts.push(`Gluten-free restriction conflicts with: ${foundGluten.join(', ')}`);
+            suggestions.push('Replace with gluten-free alternatives like rice, quinoa, corn tortillas, or gluten-free pasta');
+        }
+    }
+
+    // Check for dairy-free conflicts
+    if (restrictions.some(r => r.includes('dairy'))) {
+        const dairyIngredients = ['milk', 'cheese', 'yogurt', 'butter', 'cream'];
+        const foundDairy = dairyIngredients.filter(ing => ingredientList.includes(ing));
+        if (foundDairy.length > 0) {
+            conflicts.push(`Dairy-free restriction conflicts with: ${foundDairy.join(', ')}`);
+            suggestions.push('Replace with plant-based alternatives like almond milk, coconut yogurt, or vegan cheese');
+        }
+    }
+
+    // Check for nut-free conflicts
+    if (restrictions.some(r => r.includes('nut'))) {
+        const nutIngredients = ['almond', 'peanut', 'cashew', 'walnut', 'pecan', 'hazelnut'];
+        const foundNuts = nutIngredients.filter(ing => ingredientList.includes(ing));
+        if (foundNuts.length > 0) {
+            conflicts.push(`Nut-free restriction conflicts with: ${foundNuts.join(', ')}`);
+            suggestions.push('Replace with seeds like sunflower seeds, pumpkin seeds, or tahini');
+        }
+    }
+
+    if (conflicts.length > 0) {
+        return {
+            hasConflict: true,
+            message: `Cannot create recipes with the current ingredients and dietary restrictions. ${conflicts.join('; ')}`,
+            suggestions: suggestions
+        };
+    }
+
+    return { hasConflict: false };
+}
+
+// Build the recipe generation prompt
+function buildRecipePrompt(ingredients, servingSize, goalType, cuisine, dietaryRestrictions, unitSystem, recipeCount) {
+    const calorieRange = goalType === 'cut' ? 'under 250 calories' : 
+                        goalType === 'no_goal' ? '250-400 calories (balanced)' : 
+                        'above 400 calories';
+    
+    let dietaryInstructions = '';
+    if (dietaryRestrictions && dietaryRestrictions.trim()) {
+        dietaryInstructions = `
+
+DIETARY RESTRICTIONS TO FOLLOW:
+- ${dietaryRestrictions.trim()}
+- ALL recipes must strictly comply with these restrictions
+- Do NOT use any ingredients that violate these restrictions
+- Ensure all cooking methods and ingredients are compliant`;
+    }
+    
+    return `You are a professional chef and nutritionist. Create exactly ${recipeCount} unique recipes using ONLY these ingredients: ${ingredients}${dietaryInstructions}
+
+CRITICAL REQUIREMENTS:
+- Use ONLY the ingredients listed above
+- Do NOT add any ingredients not in the list
+- Create EXACTLY ${recipeCount} recipes; no more, no less. 
+- Each recipe must be ${calorieRange}
+- Each recipe must be ${goalType === 'cut' ? 'cut-friendly' : goalType === 'no_goal' ? 'balanced and nutritious' : 'bulk-friendly'}
+- Provide detailed, step-by-step cooking instructions
+- Include specific ingredient quantities and cooking methods
+- ${dietaryRestrictions && dietaryRestrictions.trim() ? 'STRICTLY follow all dietary restrictions provided' : ''}
+- CUISINE REQUIREMENT: ALL recipes MUST be ${cuisine} cuisine. Use authentic ${cuisine} cooking methods, spices, and techniques. Do NOT create generic recipes - make them truly ${cuisine} authentic.
+
+FORMAT EACH RECIPE EXACTLY LIKE THIS:
+
+=== RECIPE 1 ===
+Recipe Title: [Creative, descriptive name]
+Cuisine: [Specific cuisine type]
+Prep Time + Cook Time: [e.g., 15 minutes + 25 minutes]
+Number of Servings (per average adult) + Serving Size: [e.g., 2 servings (1 plate)]
+Caloric Amount per general serving for adults: [specific number]
+Balance Factor: [MUST include ALL categories: protein, carbs, fiber, vitamins, fats - e.g., 30% protein, 35% carbs, 15% fiber, 10% vitamins, 10% fats]
+Goal Type: [${goalType === 'cut' ? 'cut-friendly' : goalType === 'no_goal' ? 'balanced and nutritious' : 'bulk-friendly'}]
+Cooking Required: [Yes/No - specify if this recipe requires cooking or can be made without heat]
+Required Tools: [List specific tools needed: pan, blender, peeler, knife, cutting board, etc.]
+
+List of Ingredients:
+- [ingredient name] - [amount/quantity in ${unitSystem === 'metric' ? 'metric units (g, ml, kg)' : 'customary units (oz, cups, tbsp, tsp)'}] (protein/carbs/fiber/vitamins/fats)
+- [ingredient name] - [amount/quantity in ${unitSystem === 'metric' ? 'metric units (g, ml, kg)' : 'customary units (oz, cups, tbsp, tsp)'}] (protein/carbs/fiber/vitamins/fats)
+- [continue with all ingredients used]
+
+Actual recipe steps:
+1. [Detailed step using specific ingredients and quantities]
+2. [Detailed step using specific ingredients and quantities]
+3. [Continue with all steps]
+
+Substitutes: [Specific substitution suggestions]
+
+Cultural Background: [Write 2-3 COMPLETE sentences about THIS SPECIFIC DISH's history, cultural significance, and ethnic symbolism. Make it unique to this recipe. Do NOT cut off mid-sentence. Provide the FULL cultural background without truncation.]
+
+CRITICAL REQUIREMENTS:
+- You MUST include the "List of Ingredients:" section with ONLY the ingredients actually used in this specific recipe
+- Each ingredient MUST show its exact amount/quantity in ${unitSystem === 'metric' ? 'metric units (g, ml, kg)' : 'customary units (oz, cups, tbsp, tsp)'} and ALL applicable dietary classes (protein, carbs, fiber, vitamins, fats)
+- Each Cultural Background MUST be unique to that specific dish, not generic
+- Cultural Background MUST be complete and not truncated - write full sentences until the end
+- Do NOT skip any sections
+- EVERY recipe MUST include ALL dietary categories (protein, carbs, fiber, vitamins, fats) in the Balance Factor
+- Ensure each recipe has a balanced nutritional profile with all categories represented
+- IMPORTANT: Only list ingredients that are actually used in the cooking steps of this recipe
+
+=== RECIPE 2 ===
+[Repeat exact same format]
+
+=== RECIPE 3 ===
+[Repeat exact same format]
+
+=== RECIPE 4 ===
+[Repeat exact same format]
+
+=== RECIPE 5 ===
+[Repeat exact same format]
+
+=== RECIPE 6 ===
+[Repeat exact same format]
+
+=== RECIPE 7 ===
+[Repeat exact same format]
+
+Remember: Use ONLY these ingredients: ${ingredients}. Each recipe must be unique and include detailed cooking instructions. ${dietaryRestrictions && dietaryRestrictions.trim() ? `All recipes must comply with: ${dietaryRestrictions.trim()}` : ''}
+
+CUISINE ENFORCEMENT: Every single recipe MUST be authentic ${cuisine} cuisine. Use traditional ${cuisine} cooking techniques, authentic ${cuisine} spices and seasonings, and follow ${cuisine} culinary traditions. Do NOT create generic recipes - make them genuinely ${cuisine} authentic.`;
+}
+
+// Parse the generated text into structured recipe objects
+function parseRecipesFromText(text, goalType, originalIngredients, unitSystem, recipeCount) {
+    console.log('Parsing text:', text.substring(0, 500) + '...');
+    
+    const recipes = [];
+    
+    // Split by recipe sections using the new format
+    const recipeSections = text.split(/=== RECIPE \d+ ===/).filter(section => section.trim());
+    
+    console.log(`Found ${recipeSections.length} recipe sections`);
+    
+    recipeSections.forEach((section, index) => {
+        if (section.trim().length < 100) {
+            console.log(`Skipping short section ${index}:`, section.trim());
+            return;
+        }
+        
+        try {
+            const recipe = parseSingleRecipe(section, goalType, originalIngredients, unitSystem);
+            if (recipe) {
+                console.log(`Successfully parsed recipe ${index + 1}:`, recipe.title);
+                recipes.push(recipe);
+            } else {
+                console.log(`Failed to parse recipe ${index + 1}`);
+            }
+        } catch (error) {
+            console.error(`Error parsing recipe ${index + 1}:`, error);
+        }
+    });
+    
+    // If parsing fails, try alternative parsing method
+    if (recipes.length === 0) {
+        console.log('Primary parsing failed, trying alternative method...');
+        const alternativeRecipes = parseRecipesAlternative(text, goalType, originalIngredients, unitSystem);
+        if (alternativeRecipes.length > 0) {
+            return alternativeRecipes.slice(0, recipeCount);
+        }
+        throw new Error('Failed to parse recipes from AI response');
+    }
+    
+    return recipes.slice(0, recipeCount);
+}
+
+function parseSingleRecipe(text, goalType, originalIngredients, unitSystem) {
+    console.log('Parsing single recipe text:', text.substring(0, 200) + '...');
+    
+    // Extract recipe information using regex patterns
+    const titleMatch = text.match(/Recipe Title:\s*(.+?)(?:\n|$)/i);
+    const cuisineMatch = text.match(/Cuisine:\s*(.+?)(?:\n|$)/i);
+    const timeMatch = text.match(/Prep Time.*?Cook Time:\s*(.+?)(?:\n|$)/i);
+    const servingsMatch = text.match(/Number of Servings.*?Serving Size:\s*(.+?)(?:\n|$)/i);
+    const caloriesMatch = text.match(/Caloric Amount.*?(\d+)/i);
+    const balanceMatch = text.match(/Balance Factor:\s*(.+?)(?:\n|$)/i);
+    const cookingMatch = text.match(/Cooking Required:\s*(.+?)(?:\n|$)/i);
+    const toolsMatch = text.match(/Required Tools:\s*(.+?)(?:\n|$)/i);
+    
+    if (!titleMatch) {
+        console.log('No title found in recipe section');
+        return null;
+    }
+    
+    const title = titleMatch[1].trim();
+    const cuisine = cuisineMatch ? cuisineMatch[1].trim() : 'Global';
+    const timeInfo = timeMatch ? timeMatch[1].trim() : '15 minutes + 20 minutes';
+    const servingsInfo = servingsMatch ? servingsMatch[1].trim() : '2 servings (1 plate)';
+    const calories = caloriesMatch ? parseInt(caloriesMatch[1]) : (goalType === 'cut' ? 220 : goalType === 'no_goal' ? 325 : 450);
+    const balanceFactor = balanceMatch ? balanceMatch[1].trim() : '40% carbs, 30% protein, 30% fats';
+    const requiresCooking = cookingMatch ? cookingMatch[1].trim().toLowerCase().includes('yes') : true;
+    const tools = toolsMatch ? toolsMatch[1].trim() : 'Basic kitchen tools';
+    
+    // Extract ingredients
+    let ingredients = extractIngredients(text, unitSystem);
+    
+    // If no ingredients found, create fallback from original ingredients
+    if (ingredients.length === 0 || (ingredients.length === 1 && ingredients[0].name.includes('Please check'))) {
+        console.log('Creating fallback ingredients from original list');
+        ingredients = originalIngredients.split(/[,\n]/).filter(item => item.trim()).map(item => ({
+            name: item.trim(),
+            amount: getDefaultAmount(item.trim(), unitSystem),
+            category: [getDietaryCategory(item.trim(), 'ingredient')]
+        }));
+    } else {
+        // Clean up ingredient names to remove any misspellings or inconsistencies
+        ingredients = ingredients.map(ingredient => {
+            // Standardize common ingredient names
+            let cleanName = ingredient.name.toLowerCase().trim();
+            
+            // Fix common misspellings and variations
+            const corrections = {
+                'tomatos': 'tomatoes',
+                'tomatos': 'tomatoes',
+                'tomatos': 'tomatoes',
+                'eggs': 'eggs',
+                'egg': 'eggs',
+                'onions': 'onions',
+                'onion': 'onions',
+                'garlics': 'garlic',
+                'garlic': 'garlic',
+                'spinachs': 'spinach',
+                'spinach': 'spinach',
+                'rices': 'rice',
+                'rice': 'rice',
+                'chickens': 'chicken',
+                'chicken': 'chicken',
+                'beefs': 'beef',
+                'beef': 'beef',
+                'fishes': 'fish',
+                'fish': 'fish',
+                'oils': 'oil',
+                'oil': 'oil',
+                'salts': 'salt',
+                'salt': 'salt',
+                'peppers': 'pepper',
+                'pepper': 'pepper'
+            };
+            
+            // Apply corrections
+            for (const [wrong, correct] of Object.entries(corrections)) {
+                if (cleanName === wrong) {
+                    cleanName = correct;
+                    break;
+                }
+            }
+            
+            // Capitalize first letter
+            cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+            
+                            return {
+                    name: cleanName,
+                    amount: ingredient.amount || getDefaultAmount(cleanName, unitSystem),
+                    category: Array.isArray(ingredient.category) ? ingredient.category : [getDietaryCategory(cleanName, ingredient.category)]
+                };
+        });
+    }
+    
+    // Extract steps
+    const steps = extractSteps(text);
+    
+    // Extract substitutes and history
+    const substitutes = extractSubstitutes(text);
+    const history = extractHistory(text);
+    
+    // Log and validate cultural background
+    console.log(`Cultural background for ${title}:`, history);
+    if (history && history.length < 50) {
+        console.warn(`Cultural background for ${title} seems too short (${history.length} chars):`, history);
+    }
+    
+    const recipe = {
+        title,
+        cuisine,
+        prepTime: timeInfo.split('+')[0]?.trim() || '15 minutes',
+        cookTime: timeInfo.split('+')[1]?.trim() || '20 minutes',
+        servings: servingsInfo.split('(')[0]?.trim() || '2',
+        servingSize: servingsInfo.match(/\(([^)]+)\)/)?.[1] || '1 plate',
+        calories,
+        balanceFactor,
+        goalType,
+        requiresCooking,
+        tools,
+        ingredients,
+        steps,
+        substitutes,
+        history
+    };
+    
+    console.log('Parsed recipe:', {
+        title: recipe.title,
+        ingredientsCount: recipe.ingredients.length,
+        stepsCount: recipe.steps.length
+    });
+    
+    return recipe;
+}
+
+function extractIngredients(text, unitSystem) {
+    console.log('Extracting ingredients from text...');
+    
+    // Try multiple patterns to find ingredients
+    const patterns = [
+        /List of Ingredients:(.*?)(?=Actual recipe steps|Recipe steps|Steps:|Instructions:|$)/is,
+        /Ingredients:(.*?)(?=Instructions:|Steps:|$)/is,
+        /Ingredients List:(.*?)(?=Instructions:|Steps:|$)/is
+    ];
+    
+    let ingredientMatches = null;
+    for (const pattern of patterns) {
+        ingredientMatches = text.match(pattern);
+        if (ingredientMatches) {
+            console.log('Found ingredients section with pattern');
+            break;
+        }
+    }
+    
+    if (!ingredientMatches) {
+        console.log('No ingredients section found, searching entire text...');
+        // If we can't find ingredients section, try to extract from the entire text
+        const lines = text.split('\n').filter(line => line.trim());
+        const ingredients = [];
+        
+        for (const line of lines) {
+            // Look for lines that might be ingredients (containing common ingredient words)
+            const ingredientPattern = /[-•*]\s*(.+?)(?:\s*\(([^)]+)\))?/;
+            const match = line.match(ingredientPattern);
+            
+            if (match && match[1].trim().length > 2) {
+                const ingredientName = match[1].trim();
+                const category = match[2]?.trim() || 'ingredient';
+                
+                // Skip if it's clearly not an ingredient
+                if (!ingredientName.toLowerCase().includes('step') && 
+                    !ingredientName.toLowerCase().includes('instruction') &&
+                    !ingredientName.toLowerCase().includes('prep') &&
+                    !ingredientName.toLowerCase().includes('cook') &&
+                    !ingredientName.toLowerCase().includes('recipe') &&
+                    !ingredientName.toLowerCase().includes('cuisine') &&
+                    !ingredientName.toLowerCase().includes('title') &&
+                    !ingredientName.toLowerCase().includes('caloric') &&
+                    !ingredientName.toLowerCase().includes('balance')) {
+                    ingredients.push({
+                        name: ingredientName,
+                        amount: getDefaultAmount(ingredientName, unitSystem),
+                        category: getDietaryCategory(ingredientName, category)
+                    });
+                }
+            }
+        }
+        
+        if (ingredients.length > 0) {
+            console.log(`Found ${ingredients.length} ingredients in text search`);
+            return ingredients;
+        }
+        
+        // If still no ingredients found, try to extract from the original ingredients list
+        console.log('No ingredients found in text, trying to extract from original ingredients...');
+        return [
+            { name: "Please check the AI response for specific ingredients", amount: "1 portion", category: "various" }
+        ];
+    }
+    
+    const ingredientText = ingredientMatches[1];
+    const lines = ingredientText.split('\n').filter(line => line.trim());
+    
+    const ingredients = lines.map(line => {
+        // Enhanced pattern to capture amount and multiple categories
+        const match = line.match(/[-•*]\s*(.+?)(?:\s*\(([^)]+)\))?/);
+        if (match) {
+            const ingredientName = match[1].trim();
+            const category = match[2]?.trim() || 'ingredient';
+            
+            // Try to extract amount from ingredient name
+            const amountMatch = ingredientName.match(/^(.+?)\s*-\s*(.+)$/);
+            let name = ingredientName;
+            let amount = '1 portion';
+            
+            if (amountMatch) {
+                name = amountMatch[1].trim();
+                amount = amountMatch[2].trim();
+            }
+            
+            // Parse multiple dietary categories
+            const categories = parseDietaryCategories(category);
+            
+            return {
+                name: name,
+                amount: amount,
+                category: categories
+            };
+        }
+        const ingredientName = line.trim().replace(/^[-•*]\s*/, '');
+        return {
+            name: ingredientName,
+            amount: getDefaultAmount(ingredientName, unitSystem),
+            category: [getDietaryCategory(ingredientName, 'ingredient')]
+        };
+    }).filter(ing => ing.name && ing.name.length > 2);
+    
+    console.log(`Extracted ${ingredients.length} ingredients:`, ingredients.map(i => `${i.name} (${Array.isArray(i.category) ? i.category.join(', ') : i.category})`));
+    return ingredients;
+}
+
+// Helper function to parse multiple dietary categories
+function parseDietaryCategories(categoryString) {
+    if (!categoryString) return ['ingredient'];
+    
+    const categories = categoryString.toLowerCase().split(/[\/,]/).map(cat => cat.trim());
+    const validCategories = ['protein', 'carbs', 'fiber', 'vitamins', 'fats', 'minerals'];
+    
+    const parsedCategories = categories.filter(cat => validCategories.includes(cat));
+    
+    // If no valid categories found, try to determine from the category string
+    if (parsedCategories.length === 0) {
+        const combinedString = categoryString.toLowerCase();
+        const detectedCategories = [];
+        
+        if (combinedString.includes('protein')) detectedCategories.push('protein');
+        if (combinedString.includes('carb')) detectedCategories.push('carbs');
+        if (combinedString.includes('fiber')) detectedCategories.push('fiber');
+        if (combinedString.includes('vitamin')) detectedCategories.push('vitamins');
+        if (combinedString.includes('fat')) detectedCategories.push('fats');
+        if (combinedString.includes('mineral')) detectedCategories.push('minerals');
+        
+        return detectedCategories.length > 0 ? detectedCategories : ['ingredient'];
+    }
+    
+    return parsedCategories;
+}
+
+// Helper function to get default amount based on ingredient name and unit system
+function getDefaultAmount(ingredientName, unitSystem) {
+    const name = ingredientName.toLowerCase();
+    
+    // Check if it's a count-based ingredient (not measured in weight/volume)
+    const countBasedIngredients = ['tomato', 'tomatoes', 'egg', 'eggs', 'bell pepper', 'bell peppers', 'onion', 'onions', 'garlic', 'clove'];
+    const isCountBased = countBasedIngredients.some(item => name.includes(item));
+    
+    if (isCountBased) {
+        if (name.includes('tomato')) return '1 medium';
+        if (name.includes('egg')) return '1 large';
+        if (name.includes('bell pepper')) return '1 medium';
+        if (name.includes('onion')) return '1 medium';
+        if (name.includes('garlic') || name.includes('clove')) return '1 clove';
+        return '1 piece';
+    }
+    
+    if (unitSystem === 'metric') {
+        if (name.includes('oil') || name.includes('butter')) return '15ml';
+        if (name.includes('salt') || name.includes('pepper') || name.includes('spice')) return '5g';
+        if (name.includes('chicken') || name.includes('beef') || name.includes('fish')) return '150g';
+        if (name.includes('rice') || name.includes('pasta')) return '100g';
+        if (name.includes('spinach') || name.includes('kale')) return '50g';
+        return '100g';
+    } else {
+        if (name.includes('oil') || name.includes('butter')) return '1 tbsp';
+        if (name.includes('salt') || name.includes('pepper') || name.includes('spice')) return '1 tsp';
+        if (name.includes('chicken') || name.includes('beef') || name.includes('fish')) return '5 oz';
+        if (name.includes('rice') || name.includes('pasta')) return '1/2 cup';
+        if (name.includes('spinach') || name.includes('kale')) return '1 cup';
+        return '1/2 cup';
+    }
+}
+
+// Helper function to determine dietary category based on ingredient name
+function getDietaryCategory(ingredientName, originalCategory) {
+    const name = ingredientName.toLowerCase();
+    
+    // Skip if it's already a proper dietary category
+    if (['protein', 'carbs', 'fiber', 'vitamins', 'fats', 'minerals'].includes(originalCategory.toLowerCase())) {
+        return originalCategory;
+    }
+    
+    // Protein sources
+    if (name.includes('chicken') || name.includes('beef') || name.includes('pork') || 
+        name.includes('fish') || name.includes('salmon') || name.includes('tuna') ||
+        name.includes('egg') || name.includes('tofu') || name.includes('tempeh') ||
+        name.includes('legume') || name.includes('bean') || name.includes('lentil') ||
+        name.includes('quinoa') || name.includes('seitan') || name.includes('protein')) {
+        return 'protein';
+    }
+    
+    // Carbohydrate sources
+    if (name.includes('rice') || name.includes('pasta') || name.includes('bread') ||
+        name.includes('potato') || name.includes('sweet potato') || name.includes('corn') ||
+        name.includes('oat') || name.includes('wheat') || name.includes('flour') ||
+        name.includes('noodle') || name.includes('tortilla') || name.includes('wrap')) {
+        return 'carbs';
+    }
+    
+    // Fiber sources
+    if (name.includes('spinach') || name.includes('kale') || name.includes('broccoli') ||
+        name.includes('cauliflower') || name.includes('cabbage') || name.includes('lettuce') ||
+        name.includes('celery') || name.includes('asparagus') || name.includes('zucchini') ||
+        name.includes('cucumber') || name.includes('bell pepper') || name.includes('mushroom')) {
+        return 'fiber';
+    }
+    
+    // Vitamin sources
+    if (name.includes('tomato') || name.includes('carrot') || name.includes('sweet potato') ||
+        name.includes('bell pepper') || name.includes('citrus') || name.includes('lemon') ||
+        name.includes('lime') || name.includes('orange') || name.includes('berry') ||
+        name.includes('apple') || name.includes('banana') || name.includes('avocado')) {
+        return 'vitamins';
+    }
+    
+    // Fat sources
+    if (name.includes('oil') || name.includes('olive') || name.includes('avocado') ||
+        name.includes('nut') || name.includes('seed') || name.includes('butter') ||
+        name.includes('cheese') || name.includes('cream') || name.includes('milk') ||
+        name.includes('yogurt') || name.includes('coconut')) {
+        return 'fats';
+    }
+    
+    // Default to ingredient if no specific category found
+    return 'ingredient';
+}
+
+function extractSteps(text) {
+    console.log('Extracting steps from text...');
+    
+    const patterns = [
+        /Actual recipe steps:(.*?)(?=Substitutes|Cultural Background|History|=== RECIPE|$)/is,
+        /Instructions:(.*?)(?=Substitutes|Cultural Background|History|=== RECIPE|$)/is,
+        /Steps:(.*?)(?=Substitutes|Cultural Background|History|=== RECIPE|$)/is
+    ];
+    
+    let stepsMatch = null;
+    for (const pattern of patterns) {
+        stepsMatch = text.match(pattern);
+        if (stepsMatch) {
+            console.log('Found steps section with pattern');
+            break;
+        }
+    }
+    
+    if (!stepsMatch) {
+        console.log('No steps section found, searching for numbered steps...');
+        // Try to find numbered steps in the text
+        const lines = text.split('\n').filter(line => line.trim());
+        const steps = [];
+        
+        for (const line of lines) {
+            // Look for numbered steps (1., 2., etc.) or bullet points
+            const stepPattern = /^\d+\.\s*(.+)$/;
+            const bulletPattern = /^[-•*]\s*(.+)$/;
+            
+            const stepMatch = line.match(stepPattern) || line.match(bulletPattern);
+            if (stepMatch && stepMatch[1].trim().length > 5) {
+                const step = stepMatch[1].trim();
+                // Skip if it's clearly not a cooking step
+                if (!step.toLowerCase().includes('recipe') && 
+                    !step.toLowerCase().includes('cuisine') &&
+                    !step.toLowerCase().includes('title')) {
+                    steps.push(step);
+                }
+            }
+        }
+        
+        if (steps.length > 0) {
+            console.log(`Found ${steps.length} steps in text search`);
+            return steps;
+        }
+        
+        console.log('No steps found, returning placeholder');
+        return ["Follow the recipe instructions provided by the AI"];
+    }
+    
+    const stepsText = stepsMatch[1];
+    const lines = stepsText.split('\n').filter(line => line.trim());
+    
+    const steps = lines.map(line => {
+        return line.trim().replace(/^\d+\.\s*/, '').replace(/^[-•*]\s*/, '');
+    }).filter(step => step.length > 5);
+    
+    console.log(`Extracted ${steps.length} steps`);
+    return steps;
+}
+
+function extractSubstitutes(text) {
+    const patterns = [
+        /Substitutes:(.*?)(?=Cultural Background|History|=== RECIPE|$)/is,
+        /Substitutions:(.*?)(?=Cultural Background|History|=== RECIPE|$)/is,
+        /Alternative ingredients:(.*?)(?=Cultural Background|History|=== RECIPE|$)/is
+    ];
+    
+    let substitutesMatch = null;
+    for (const pattern of patterns) {
+        substitutesMatch = text.match(pattern);
+        if (substitutesMatch) break;
+    }
+    
+    return substitutesMatch ? substitutesMatch[1].trim() : "Feel free to substitute ingredients based on your preferences and dietary needs.";
+}
+
+function extractHistory(text) {
+    const patterns = [
+        /Cultural Background:(.*?)(?==== RECIPE|$)/is,
+        /History:(.*?)(?==== RECIPE|$)/is,
+        /Cultural significance:(.*?)(?==== RECIPE|$)/is,
+        /Background:(.*?)(?==== RECIPE|$)/is
+    ];
+    
+    let historyMatch = null;
+    for (const pattern of patterns) {
+        historyMatch = text.match(pattern);
+        if (historyMatch) break;
+    }
+    
+    let history = historyMatch ? historyMatch[1].trim() : "";
+    
+    // Clean up the history text - remove any trailing newlines and extra whitespace
+    if (history) {
+        history = history.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    
+    // If no history found or too short, create a unique one based on the recipe content
+    if (!history || history.length < 30) {
+        // Extract recipe title to create contextual history
+        const titleMatch = text.match(/Recipe Title:\s*(.+?)(?:\n|$)/i);
+        const cuisineMatch = text.match(/Cuisine:\s*(.+?)(?:\n|$)/i);
+        
+        const title = titleMatch ? titleMatch[1].trim() : "this dish";
+        const cuisine = cuisineMatch ? cuisineMatch[1].trim() : "global";
+        
+        history = `This ${title.toLowerCase()} represents a modern interpretation of ${cuisine.toLowerCase()} culinary traditions. The dish showcases how traditional cooking methods can be adapted to contemporary tastes while maintaining authentic flavors and cultural significance.`;
+    }
+    
+    return history;
+}
+
+// Alternative parsing method for when the primary method fails
+function parseRecipesAlternative(text, goalType, originalIngredients, unitSystem) {
+    console.log('Using alternative parsing method...');
+    
+    const recipes = [];
+    
+    // Try to find recipes by looking for "Recipe Title:" patterns
+    const recipeMatches = text.match(/Recipe Title:\s*(.+?)(?=Recipe Title:|Cultural Background:|$)/gis);
+    
+    if (recipeMatches) {
+        recipeMatches.forEach((match, index) => {
+            try {
+                const recipe = parseSingleRecipe(match, goalType, originalIngredients, unitSystem);
+                if (recipe) {
+                    recipes.push(recipe);
+                }
+            } catch (error) {
+                console.error(`Error in alternative parsing for recipe ${index + 1}:`, error);
+            }
+        });
+    }
+    
+    return recipes;
+}
+
+// Validate recipes to ensure they have proper content
+function validateRecipes(recipes) {
+    console.log(`Validating ${recipes.length} recipes...`);
+    
+    return recipes.map((recipe, index) => {
+        // Check if recipe has proper title (not generic)
+        if (!recipe.title || 
+            recipe.title.toLowerCase().includes('caloric amount') ||
+            recipe.title.toLowerCase().includes('list of ingredients') ||
+            recipe.title.toLowerCase().includes('recipe title')) {
+            recipe.title = `Recipe ${index + 1}`;
+        }
+        
+        // Check if ingredients are generic placeholders or missing
+        if (recipe.ingredients.length === 0 || 
+            (recipe.ingredients.length === 1 && 
+             (recipe.ingredients[0].name.toLowerCase().includes('use the ingredients') ||
+              recipe.ingredients[0].name.toLowerCase().includes('ingredients from your list') ||
+              recipe.ingredients[0].name.toLowerCase().includes('please check the ai response')))) {
+            recipe.ingredients = [
+                { name: "Please check the AI response for specific ingredients", amount: "1 portion", category: "various" }
+            ];
+        } else {
+            // Ensure all ingredients have proper dietary categories
+            recipe.ingredients = recipe.ingredients.map(ingredient => ({
+                name: ingredient.name,
+                amount: ingredient.amount || '1 portion',
+                category: Array.isArray(ingredient.category) ? ingredient.category : [getDietaryCategory(ingredient.name, ingredient.category)]
+            }));
+        }
+        
+        // Check if steps are generic placeholders
+        if (recipe.steps.length === 1 && 
+            recipe.steps[0].toLowerCase().includes('follow the recipe instructions')) {
+            recipe.steps = [
+                "Please check the AI response for detailed cooking instructions"
+            ];
+        }
+        
+        // Ensure servings doesn't have duplicate text
+        if (recipe.servings && recipe.servings.includes('servings servings')) {
+            recipe.servings = recipe.servings.replace('servings servings', 'servings');
+        }
+        
+        console.log(`Validated recipe ${index + 1}:`, {
+            title: recipe.title,
+            ingredientsCount: recipe.ingredients.length,
+            stepsCount: recipe.steps.length
+        });
+        
+        return recipe;
+    });
+}
+
+
+
+// Start server
+app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📋 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`🤖 Recipe generator: http://localhost:${PORT}/recipe-generator.html`);
+    console.log(`🔑 Gemini API configured: ${!!GEMINI_API_KEY}`);
+});
+
+module.exports = app;

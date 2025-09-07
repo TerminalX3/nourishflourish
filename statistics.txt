@@ -1,0 +1,67 @@
+Nourish 'N' Flourish - AI Recipe Generator Statistics
+====================================================
+
+Last Updated: 9/6/2025, 1:49:07 PM
+
+=== GENERAL STATISTICS ===
+Total Page Views: 6
+Total AI Recipe Calls: 6
+Total Unique Recipes Generated: 41
+Total Recipes Liked: 4
+Total Recipes Disliked: 1
+
+=== GOAL TYPE BREAKDOWN ===
+Cut (Weight Loss) Recipes: 0
+No Goal (Balanced) Recipes: 7
+Bulk (Muscle Gain) Recipes: 14
+
+=== CUISINE PREFERENCES ===
+Global: 3
+Italian: 0
+Mexican: 0
+Asian: 0
+Indian: 0
+Mediterranean: 0
+American: 0
+French: 0
+Middle Eastern: 0
+African: 0
+Latin American: 0
+
+=== CUISINE RECIPES ===
+African: 0
+American: 0
+Asian: 2
+Ethiopian: 1
+French: 0
+Greek: 2
+Indian: 2
+Italian: 2
+Latin American: 0
+Mediterranean: 1
+Mexican: 2
+Middle Eastern: 0
+South Indian: 1
+Spanish: 2
+
+=== DIETARY RESTRICTIONS ===
+No Restrictions: 2
+Gluten-Free: 0
+Vegan: 0
+Dairy-Free: 0
+Nut-Free: 0
+Low-Sodium: 0
+Other: 1
+
+=== RECIPE FEEDBACK ===
+Like Rate: 80.0%
+Dislike Rate: 20.0%
+Total Feedback Given: 5
+
+=== RECENT ACTIVITY ===
+(No recent activity)
+
+=== SYSTEM INFORMATION ===
+Server Start Time: 2025-09-06T16:39:43.381Z
+Last Recipe Generated: 2025-09-06T16:47:24.606Z
+Average Recipe Generation Time: 0 seconds

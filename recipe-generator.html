@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Recipe Generator - Nourish 'N' Flourish</title>
+    <link rel="icon" href="logo.png" type="image/png">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="recipe-generator.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/boxicons@2.0.7/css/boxicons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fas fa-seedling logo-icon"></i>
+            <h1>Nourish 'N' Flourish</h1>
+        </div>
+        <div class="nav-links">
+            <a href="index.html"><i class="fas fa-home"></i> Home</a>
+            <a href="index.html#about"><i class="fas fa-heart"></i> About</a>
+            <a href="index.html#initiatives"><i class="fas fa-hand-holding-heart"></i> Initiatives</a>
+            <a href="index.html#team"><i class="fas fa-users"></i> Team</a>
+            <a href="index.html#contact"><i class="fas fa-envelope"></i> Contact</a>
+        </div>
+    </nav>
+
+    <header class="recipe-hero">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <h1><i class="fas fa-robot"></i> AI Recipe Generator</h1>
+            <p>Transform your ingredients into delicious, nutritionally balanced meals with our AI-powered recipe generator. Perfect for teens learning to cook!</p>
+            <a href="index.html" class="back-button">
+                <i class="fas fa-arrow-left"></i>
+                <span>Back to Main</span>
+            </a>
+        </div>
+    </header>
+
+    <main class="recipe-main">
+        <div class="container">
+            <section class="recipe-form-section">
+                <div class="form-container">
+                    <h2><i class="fas fa-utensils"></i> Create Your Perfect Recipe</h2>
+                    <p class="form-description">Tell us what's in your fridge and we'll create personalized recipes just for you!</p>
+                    
+                    <form id="recipeForm" class="recipe-form">
+                        <div class="form-group">
+                            <label for="ingredients">
+                                What's in your fridge?
+                            </label>
+                            <textarea 
+                                id="ingredients" 
+                                name="ingredients" 
+                                placeholder="List your ingredients here (e.g., chicken breast, rice, tomatoes, spinach, eggs...)" 
+                                required
+                            ></textarea>
+                            <small>Separate ingredients with commas or new lines</small>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="servingSize">
+                                    Serving Size
+                                </label>
+                                <select id="servingSize" name="servingSize" required>
+                                    <option value="">Select serving size</option>
+                                    <option value="1">1 person</option>
+                                    <option value="2">2 people</option>
+                                    <option value="3">3 people</option>
+                                    <option value="4">4 people</option>
+                                    <option value="6">6 people</option>
+                                    <option value="8">8+ people</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="goalType">
+                                    Your Goal
+                                </label>
+                                <select id="goalType" name="goalType" required>
+                                    <option value="">Select your goal</option>
+                                    <option value="cut">Cut (Weight Loss) - Under 250 calories</option>
+                                    <option value="no_goal">No Goal - Balanced nutrition</option>
+                                    <option value="bulk">Bulk (Muscle Gain) - Over 400 calories</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="cuisine">
+                                Preferred Cuisine
+                            </label>
+                            <select id="cuisine" name="cuisine" required>
+                                <option value="">Select cuisine preference</option>
+                                <option value="global">Global (Mix of cuisines)</option>
+                                <option value="italian">Italian</option>
+                                <option value="mexican">Mexican</option>
+                                <option value="asian">Asian (Chinese, Japanese, Korean, Thai)</option>
+                                <option value="indian">Indian</option>
+                                <option value="mediterranean">Mediterranean</option>
+                                <option value="american">American</option>
+                                <option value="french">French</option>
+                                <option value="middle_eastern">Middle Eastern</option>
+                                <option value="african">African</option>
+                                <option value="latin_american">Latin American</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dietaryRestrictions">
+                                Dietary Restrictions
+                            </label>
+                            <input 
+                                type="text" 
+                                id="dietaryRestrictions" 
+                                name="dietaryRestrictions" 
+                                placeholder="e.g., gluten-free, vegan, dairy-free, nut-free, low-sodium..."
+                            >
+                            <small>Leave blank if no restrictions. Separate multiple restrictions with commas.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="unitSystem">
+                                Unit System
+                            </label>
+                            <select id="unitSystem" name="unitSystem">
+                                <option value="metric">Metric (g, ml, kg)</option>
+                                <option value="customary">Customary (oz, cups, lbs)</option>
+                            </select>
+                            <small>Choose your preferred measurement system for ingredient amounts.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="recipeCount">
+                                Number of Recipes
+                            </label>
+                            <select id="recipeCount" name="recipeCount" required>
+                                <option value="">Select number of recipes</option>
+                                <option value="1">1 recipe</option>
+                                <option value="2">2 recipes</option>
+                                <option value="3">3 recipes</option>
+                                <option value="4">4 recipes</option>
+                                <option value="5">5 recipes</option>
+                                <option value="6">6 recipes</option>
+                                <option value="7">7 recipes</option>
+                            </select>
+                            <small>Choose how many recipes you'd like to generate.</small>
+                        </div>
+
+                                                 <button type="submit" class="generate-button">
+                             <i class="fas fa-magic"></i>
+                             <span>Generate Recipes</span>
+                             <div class="button-loading">
+                                 <i class="fas fa-spinner fa-spin"></i>
+                             </div>
+                         </button>
+                         
+                         
+                    </form>
+                </div>
+            </section>
+
+            <section id="results" class="results-section" style="display: none;">
+                <div class="results-container">
+                                         <h2><i class="fas fa-utensils"></i> Your Personalized Recipes</h2>
+                     
+                     <div id="recipesContainer" class="recipes-container">
+                        <!-- Recipes will be populated here -->
+                    </div>
+
+                    <div class="results-actions">
+                        <button id="newRecipeBtn" class="secondary-button">
+                            <i class="fas fa-plus"></i>
+                            Generate New Recipes
+                        </button>
+                        <button id="printRecipesBtn" class="secondary-button">
+                            <i class="fas fa-print"></i>
+                            Print Recipes
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="loading-section" id="loadingSection" style="display: none;">
+                <div class="loading-container">
+                    <div class="loading-spinner">
+                        <i class="fas fa-utensils"></i>
+                    </div>
+                    <h3>Creating Your Recipes...</h3>
+                    <p>Our AI is analyzing your ingredients and crafting the perfect recipes for you!</p>
+                    <div class="loading-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">
+                    <i class="fas fa-seedling logo-icon"></i>
+                    <h3>Nourish 'N' Flourish</h3>
+                    <p>Empowering teens through food literacy</p>
+                </div>
+                <div class="footer-links">
+                    <a href="index.html"><i class="fas fa-home"></i> Home</a>
+                    <a href="index.html#about"><i class="fas fa-heart"></i> About</a>
+                    <a href="index.html#initiatives"><i class="fas fa-hand-holding-heart"></i> Initiatives</a>
+                    <a href="index.html#team"><i class="fas fa-users"></i> Team</a>
+                    <a href="index.html#contact"><i class="fas fa-envelope"></i> Contact</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Nourish 'N' Flourish. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="recipe-generator.js"></script>
+    <script>
+        // Track page view when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('/api/track-page-view')
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    } else {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                })
+                .then(data => {
+                    if (data && data.success) {
+                        console.log('Page view tracked successfully');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error tracking page view:', error);
+                    // Don't show error to user, just log it
+                });
+        });
+    </script>
+</body>
+</html>
