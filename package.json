@@ -4,7 +4,6 @@
   "description": "AI-powered recipe generator for Nourish 'N' Flourish website",
   "main": "index.html",
   "scripts": {
-    "start": "vercel dev",
     "dev": "vercel dev",
     "build": "echo 'No build step required for static site'",
     "test": "echo \"Error: no test specified\" && exit 1"
